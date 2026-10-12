@@ -78,15 +78,15 @@ run "apply_role_push_access_is_scoped_to_the_sftpgo_ecr_repository" {
   }
 }
 
-run "apply_role_can_list_attached_policies_on_only_the_runtime_role" {
+run "apply_role_can_read_runtime_role_attachments_and_profiles" {
   command = plan
 
   assert {
     condition = anytrue([
       for s in jsondecode(file("${path.module}/sftpgo_terraform_apply_policy.json")).Statement :
-      s.Sid == "ManageSftpGoRuntimeRole" && contains(s.Action, "iam:ListAttachedRolePolicies") && s.Resource == "arn:aws:iam::042170206259:role/devops-dev-sftpgo-s3-role"
+      s.Sid == "ManageSftpGoRuntimeRole" && contains(s.Action, "iam:ListAttachedRolePolicies") && contains(s.Action, "iam:ListInstanceProfilesForRole") && s.Resource == "arn:aws:iam::042170206259:role/devops-dev-sftpgo-s3-role"
     ])
-    error_message = "Apply role may list attached policies only on the SFTPGo runtime role"
+    error_message = "Apply role may inspect attached policies and instance profiles only on the SFTPGo runtime role"
   }
 }
 
