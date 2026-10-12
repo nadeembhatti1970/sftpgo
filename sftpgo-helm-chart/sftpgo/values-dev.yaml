@@ -1,0 +1,47 @@
+# Deployment overlay for the EKS cluster managed by ../../core-infra.
+# Supply the certificate ARN from core-acm at install/upgrade time; ACM ARNs
+# are account-specific and must not be committed to this chart.
+replicaCount: 1
+
+serviceAccount:
+  create: true
+  name: sftpgo
+
+persistence:
+  enabled: true
+  pvc:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
+    storageClassName: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "10000"
+  prometheus.io/path: /metrics
+
+ui:
+  ingress:
+    enabled: true
+    className: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/group.name: sftpgo
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      alb.ingress.kubernetes.io/healthcheck-path: /healthz
+      external-dns.alpha.kubernetes.io/hostname: sftpgo.bizopensource.com
+    hosts:
+      - host: sftpgo.bizopensource.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+
+api:
+  ingress:
+    enabled: false
