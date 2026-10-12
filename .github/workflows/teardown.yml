@@ -5,6 +5,11 @@
 name: teardown
 
 on:
+  schedule:
+    # GitHub cron is UTC: 16:00 UTC = 17:00 BST, 17:00 UTC = 17:00 GMT.
+    # The gate job selects the entry matching the current London offset.
+    - cron: "0 16 * * *"
+    - cron: "0 17 * * *"
   workflow_dispatch:
     inputs:
       confirm_teardown:
@@ -23,8 +28,33 @@ env:
   TF_VERSION: 1.16.5
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - name: Run at 17:00 London time
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          run=false
+          offset=$(TZ=Europe/London date +%z)
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            run=true
+          elif [ "$SCHEDULE" = "0 16 * * *" ] && [ "$offset" = "+0100" ]; then
+            run=true
+          elif [ "$SCHEDULE" = "0 17 * * *" ] && [ "$offset" = "+0000" ]; then
+            run=true
+          fi
+          echo "London offset ${offset}, event ${EVENT} '${SCHEDULE}', run=${run}"
+          echo "run=${run}" >> "$GITHUB_OUTPUT"
+
   teardown:
     name: Detach SFTPGo workload identity
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     concurrency:
       group: sftpgo-lifecycle
@@ -34,6 +64,7 @@ jobs:
         working-directory: core-sftpgo
     steps:
       - name: Require explicit confirmation
+        if: github.event_name == 'workflow_dispatch'
         working-directory: .
         env:
           CONFIRMATION: ${{ inputs.confirm_teardown }}
