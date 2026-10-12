@@ -32,28 +32,6 @@ mock_provider "aws" {
   }
 }
 
-mock_provider "aws" {
-  alias = "replica"
-
-  mock_resource "aws_iam_role" {
-    defaults = {
-      arn = "arn:aws:iam::123456789012:role/sftpgo-test"
-    }
-  }
-
-  mock_resource "aws_kms_key" {
-    defaults = {
-      arn = "arn:aws:kms:eu-west-1:123456789012:key/22222222-2222-2222-2222-222222222222"
-    }
-  }
-
-  mock_resource "aws_s3_bucket" {
-    defaults = {
-      arn = "arn:aws:s3:::sftpgo-replica-test"
-    }
-  }
-}
-
 mock_provider "random" {}
 
 override_data {
@@ -91,34 +69,13 @@ override_data {
 }
 
 override_data {
-  target = data.aws_iam_policy_document.sftpgo_replication_assume
-  values = {
-    json = jsonencode({ Version = "2012-10-17", Statement = [] })
-  }
-}
-
-override_data {
-  target = data.aws_iam_policy_document.sftpgo_replication
-  values = {
-    json = jsonencode({ Version = "2012-10-17", Statement = [] })
-  }
-}
-
-override_data {
   target = data.aws_iam_policy_document.sftpgo_source_key
   values = {
     json = jsonencode({ Version = "2012-10-17", Statement = [] })
   }
 }
 
-override_data {
-  target = data.aws_iam_policy_document.sftpgo_replica_key
-  values = {
-    json = jsonencode({ Version = "2012-10-17", Statement = [] })
-  }
-}
-
-run "bucket_encryption_and_replication" {
+run "bucket_uses_kms_encryption" {
   command = apply
 
   assert {
@@ -129,35 +86,6 @@ run "bucket_encryption_and_replication" {
     ]) == "aws:kms"
     error_message = "The source bucket must use KMS encryption."
   }
-
-  assert {
-    condition = one([
-      for rule in aws_s3_bucket_replication_configuration.sftpgo.rule : one([
-        for destination in rule.destination : destination.bucket
-      ])
-    ]) == aws_s3_bucket.sftpgo_replica.arn
-    error_message = "The source bucket must replicate to the configured replica bucket."
-  }
-
-  assert {
-    condition = one([
-      for rule in aws_s3_bucket_replication_configuration.sftpgo.rule : one([
-        for destination in rule.destination : one([
-          for encryption in destination.encryption_configuration : encryption.replica_kms_key_id
-        ])
-      ])
-    ]) == aws_kms_key.sftpgo_replica.arn
-    error_message = "Replicated objects must use the replica-region KMS key."
-  }
-
-  assert {
-    condition     = aws_s3_bucket_versioning.sftpgo_replica.versioning_configuration[0].status == "Enabled"
-    error_message = "The replica bucket must have versioning enabled."
-  }
-}
-
-run "sftpgo_has_scoped_kms_access" {
-  command = apply
 
   assert {
     condition     = strcontains(data.aws_iam_policy_document.sftpgo_s3_access.json, "kms:GenerateDataKey")

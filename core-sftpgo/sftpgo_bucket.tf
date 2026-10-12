@@ -6,6 +6,7 @@ resource "aws_s3_bucket" "sftpgo" {
   bucket = "sftpgo-${var.environment_name}-${data.aws_caller_identity.current.account_id}-${random_id.bucket_suffix.hex}"
   tags   = merge(var.tags, { Name = "${local.name}-sftpgo-files" })
 
+  # checkov:skip=CKV_AWS_144: Cross-region replication is not required for this workload; avoid a second bucket and regional storage costs.
   # checkov:skip=CKV_AWS_18: Server access logging is intentionally disabled; S3 audit logging is not required.
   # checkov:skip=CKV2_AWS_62: S3 event notifications are intentionally disabled; S3 event auditing is not required.
 
