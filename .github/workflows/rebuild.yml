@@ -1,0 +1,27 @@
+# Rebuild SFTPGo infrastructure and publish a fresh chart package from main.
+# The protected S3 bucket and KMS key are retained by the teardown workflow.
+name: rebuild
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  guard:
+    name: Require main branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main dispatches
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::The SFTPGo rebuild workflow must be dispatched from main."
+            exit 1
+          fi
+
+  rebuild:
+    name: Rebuild SFTPGo infrastructure and chart
+    needs: guard
+    uses: ./.github/workflows/sftpgo.yml
