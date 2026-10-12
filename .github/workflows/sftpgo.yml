@@ -108,6 +108,7 @@ jobs:
       - name: Plan Terraform
         id: plan
         run: |
+          set -euo pipefail
           terraform plan -lock-timeout=10m -out=tfplan.binary -no-color | tee plan.txt
           terraform show -json tfplan.binary > tfplan.json
           {

@@ -43,6 +43,13 @@ data "aws_iam_policy_document" "sftpgo_apply_state" {
   }
 
   statement {
+    sid       = "ReadEksStateForClusterLookup"
+    effect    = "Allow"
+    actions   = ["s3:GetObject"]
+    resources = ["${local.tfstate_bucket_arn}/eks/dev/terraform.tfstate"]
+  }
+
+  statement {
     sid    = "ManageSftpGoStateAndLock"
     effect = "Allow"
     actions = [

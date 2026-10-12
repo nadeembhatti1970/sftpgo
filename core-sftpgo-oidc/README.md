@@ -8,7 +8,8 @@ provider.
 The plan role accepts only SFTPGo branch and pull request subjects, has
 read-only AWS access, and can lock only the SFTPGo application state. The apply
 role accepts only `main`, can manage the SFTPGo Terraform resources, can publish
-Helm OCI artifacts to the `sftpgo` ECR repository, and has explicit guardrails
+Helm OCI artifacts to the `sftpgo` ECR repository, and can read only the EKS
+state object needed to resolve the target cluster. It has explicit guardrails
 against modifying the shared OIDC provider, core-infra CI roles, or Terraform
 state bucket configuration.
 

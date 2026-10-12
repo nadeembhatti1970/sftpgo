@@ -78,8 +78,18 @@ run "apply_role_push_access_is_scoped_to_the_sftpgo_ecr_repository" {
   }
 }
 
-run "apply_role_state_access_is_limited_to_sftpgo_state" {
+run "apply_role_reads_only_eks_state_and_manages_only_sftpgo_state" {
   command = plan
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.sftpgo_apply_state.statement :
+      s.sid == "ReadEksStateForClusterLookup" && s.actions == toset(["s3:GetObject"]) && s.resources == toset([
+        "arn:aws:s3:::tfstate-dev-eu-west-2-8cbztj/eks/dev/terraform.tfstate",
+      ])
+    ])
+    error_message = "Apply role may read only the EKS state object needed to resolve the cluster name"
+  }
 
   assert {
     condition = anytrue([
@@ -89,6 +99,6 @@ run "apply_role_state_access_is_limited_to_sftpgo_state" {
         "arn:aws:s3:::tfstate-dev-eu-west-2-8cbztj/sftpgo/dev/terraform.tfstate.tflock",
       ])
     ])
-    error_message = "Apply role state access must remain limited to the SFTPGo state and its lock object"
+    error_message = "Apply role may mutate only the SFTPGo state and its lock object"
   }
 }
