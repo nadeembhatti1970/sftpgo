@@ -77,7 +77,7 @@ jobs:
         run: pip install --quiet -r requirements.txt
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ steps.mode.outputs.mode == 'apply' && 'arn:aws:iam::042170206259:role/devops-dev-sftpgo-gha-terraform-apply' || 'arn:aws:iam::042170206259:role/devops-dev-sftpgo-gha-terraform-plan' }}
