@@ -89,16 +89,10 @@ data "aws_iam_policy_document" "sftpgo_s3_access" {
   }
 }
 
-resource "aws_iam_policy" "sftpgo_s3_access" {
-  name        = "${local.name}-sftpgo-s3-access"
-  description = "Allow SFTPGo to manage objects under the users/ prefix in its bucket"
-  policy      = data.aws_iam_policy_document.sftpgo_s3_access.json
-  tags        = merge(var.tags, { Name = "${local.name}-sftpgo-s3-access" })
-}
-
-resource "aws_iam_role_policy_attachment" "sftpgo_s3_access" {
-  role       = aws_iam_role.sftpgo_s3.name
-  policy_arn = aws_iam_policy.sftpgo_s3_access.arn
+resource "aws_iam_role_policy" "sftpgo_s3_access" {
+  name   = "${local.name}-sftpgo-s3-access"
+  role   = aws_iam_role.sftpgo_s3.id
+  policy = data.aws_iam_policy_document.sftpgo_s3_access.json
 }
 
 resource "aws_eks_pod_identity_association" "sftpgo" {

@@ -30,6 +30,12 @@ mock_provider "aws" {
       arn = "arn:aws:s3:::sftpgo-test"
     }
   }
+
+  mock_resource "aws_ecr_repository" {
+    defaults = {
+      repository_url = "042170206259.dkr.ecr.eu-west-2.amazonaws.com/sftpgo"
+    }
+  }
 }
 
 mock_provider "random" {}
@@ -90,5 +96,19 @@ run "bucket_uses_kms_encryption" {
   assert {
     condition     = strcontains(data.aws_iam_policy_document.sftpgo_s3_access.json, "kms:GenerateDataKey")
     error_message = "The SFTPGo workload policy must allow KMS data-key generation."
+  }
+}
+
+run "chart_registry_has_immutable_tags" {
+  command = apply
+
+  assert {
+    condition     = aws_ecr_repository.sftpgo_helm_chart.name == "sftpgo"
+    error_message = "The Helm chart must be published to the dedicated SFTPGo ECR repository."
+  }
+
+  assert {
+    condition     = aws_ecr_repository.sftpgo_helm_chart.image_tag_mutability == "IMMUTABLE"
+    error_message = "Published chart versions must not be overwritten."
   }
 }

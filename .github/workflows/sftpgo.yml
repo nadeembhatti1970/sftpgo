@@ -1,0 +1,179 @@
+name: SFTPGo
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - '.github/workflows/sftpgo.yml'
+      - '.github/scripts/**'
+      - 'core-sftpgo/**'
+      - 'sftpgo-helm-chart'
+      - 'requirements.txt'
+      - 'README.md'
+  pull_request:
+    paths:
+      - '.github/workflows/sftpgo.yml'
+      - '.github/scripts/**'
+      - 'core-sftpgo/**'
+      - 'sftpgo-helm-chart'
+      - 'requirements.txt'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_VERSION: 1.16.5
+  TFSTATE_BUCKET: tfstate-dev-eu-west-2-8cbztj
+  CHART_DIR: sftpgo-helm-chart/sftpgo
+
+jobs:
+  terraform-and-chart:
+    name: Terraform checks, apply, and publish chart
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core-sftpgo
+    steps:
+      - name: Check out project and chart submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set deployment mode
+        id: mode
+        working-directory: .
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != "pull_request" && "$GITHUB_REF" == "refs/heads/main" ]]; then
+            echo "mode=apply" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=plan" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Checkov
+        working-directory: .
+        run: pip install --quiet -r requirements.txt
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ steps.mode.outputs.mode == 'apply' && 'arn:aws:iam::042170206259:role/devops-dev-sftpgo-gha-terraform-apply' || 'arn:aws:iam::042170206259:role/devops-dev-sftpgo-gha-terraform-plan' }}
+          role-session-name: gha-sftpgo-${{ github.run_id }}
+          role-duration-seconds: ${{ steps.mode.outputs.mode == 'apply' && 7200 || 3600 }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - name: Initialize Terraform
+        run: terraform init -test-directory=testing
+
+      - name: Terraform format
+        run: terraform fmt -check -recursive -diff
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Checkov static scan
+        run: checkov -d . --framework terraform --compact --quiet
+
+      - name: Lint Helm chart
+        working-directory: .
+        run: helm lint "$CHART_DIR"
+
+      - name: Plan Terraform
+        id: plan
+        run: |
+          terraform plan -lock-timeout=10m -out=tfplan.binary -no-color | tee plan.txt
+          terraform show -json tfplan.binary > tfplan.json
+          {
+            echo "### SFTPGo Terraform plan"
+            echo '```'
+            grep -E '^(Plan:|No changes)' plan.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkov plan scan
+        if: steps.plan.outcome == 'success'
+        run: |
+          skips=$("$GITHUB_WORKSPACE/.github/scripts/checkov_skips.sh" . || true)
+          if [ -n "$skips" ]; then
+            checkov -f tfplan.json --skip-check "$skips" --compact --quiet
+          else
+            checkov -f tfplan.json --compact --quiet
+          fi
+
+      - name: Prevent unapproved Terraform deletions
+        if: steps.plan.outcome == 'success'
+        working-directory: .
+        run: python3 "$GITHUB_WORKSPACE/.github/scripts/destroy_gate.py" core-sftpgo/tfplan.json core-sftpgo/testing/.checkov-allowlist.json
+
+      - name: Terraform tests
+        run: terraform test -test-directory=testing
+
+      - name: Apply Terraform plan
+        id: apply
+        if: steps.mode.outputs.mode == 'apply' && steps.plan.outcome == 'success'
+        run: terraform apply -lock-timeout=10m -auto-approve tfplan.binary
+
+      - name: Version and package Helm chart
+        if: steps.apply.outcome == 'success'
+        id: chart
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_version=$(awk -F ': *' '$1 == "appVersion" { gsub(/"/, "", $2); print $2; exit }' "$CHART_DIR/Chart.yaml")
+          if [[ -z "$app_version" ]]; then
+            echo "appVersion is missing from $CHART_DIR/Chart.yaml" >&2
+            exit 1
+          fi
+          chart_version="${app_version}+git.${GITHUB_SHA}"
+          sed -i -E "s/^version: .*/version: ${chart_version}/" "$CHART_DIR/Chart.yaml"
+          mkdir -p "$RUNNER_TEMP/sftpgo-chart"
+          helm lint "$CHART_DIR"
+          helm package "$CHART_DIR" --destination "$RUNNER_TEMP/sftpgo-chart"
+          echo "version=$chart_version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish chart to Amazon ECR OCI
+        if: steps.apply.outcome == 'success'
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          registry="$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${AWS_REGION}.amazonaws.com"
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | helm registry login "$registry" --username AWS --password-stdin
+          shopt -s nullglob
+          packages=("$RUNNER_TEMP"/sftpgo-chart/sftpgo-*.tgz)
+          if [[ ${#packages[@]} -ne 1 ]]; then
+            echo "Expected one packaged SFTPGo chart, found ${#packages[@]}" >&2
+            exit 1
+          fi
+          helm push "${packages[0]}" "oci://$registry"
+
+      - name: Summarize published chart
+        if: steps.apply.outcome == 'success'
+        working-directory: .
+        run: |
+          echo "Published SFTPGo chart version `${{ steps.chart.outputs.version }}` to the ECR `sftpgo` repository in `${AWS_REGION}`." >> "$GITHUB_STEP_SUMMARY"

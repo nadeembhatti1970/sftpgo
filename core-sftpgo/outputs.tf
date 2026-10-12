@@ -27,3 +27,8 @@ output "pod_identity_association_id" {
   description = "EKS Pod Identity association for SFTPGo"
   value       = aws_eks_pod_identity_association.sftpgo.id
 }
+
+output "helm_chart_ecr_repository_url" {
+  description = "ECR repository URL for the SFTPGo Helm chart OCI artifact"
+  value       = aws_ecr_repository.sftpgo_helm_chart.repository_url
+}

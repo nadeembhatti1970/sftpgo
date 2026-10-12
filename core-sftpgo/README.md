@@ -5,6 +5,7 @@ SFTPGo user files and a dedicated EKS Pod Identity role. The role is associated 
 `sftpgo/sftpgo` Kubernetes namespace/service-account pair and can access only
 objects below the bucket's `users/` prefix. No static AWS credentials are stored
 in Kubernetes or SFTPGo. CloudTrail S3 object data events are not configured.
+It also creates a private ECR repository for versioned Helm chart OCI artifacts.
 
 ## Deploy the infrastructure
 
@@ -26,6 +27,11 @@ seven days. S3 request metrics are enabled for the `users/` prefix; CloudWatch
 charges may apply for these metrics. Cross-region replication, CloudTrail
 object data events, S3 event notifications, and S3 server access logging are
 intentionally not configured.
+
+The ECR repository URL is available from `terraform output -raw
+helm_chart_ecr_repository_url`. Chart version tags are immutable and retained
+for rollback; ECR storage charges depend on the number and size of published
+chart versions.
 
 ## Connect SFTPGo
 
