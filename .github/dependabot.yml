@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: sunday
+      time: "03:00"
+      timezone: Europe/London
+
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: sunday
+      time: "03:00"
+      timezone: Europe/London
+
+  - package-ecosystem: terraform
+    directory: "/core-sftpgo"
+    schedule:
+      interval: weekly
+      day: sunday
+      time: "03:00"
+      timezone: Europe/London
+
+  - package-ecosystem: terraform
+    directory: "/core-sftpgo-oidc"
+    schedule:
+      interval: weekly
+      day: sunday
+      time: "03:00"
+      timezone: Europe/London
