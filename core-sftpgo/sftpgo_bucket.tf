@@ -6,6 +6,9 @@ resource "aws_s3_bucket" "sftpgo" {
   bucket = "sftpgo-${var.environment_name}-${data.aws_caller_identity.current.account_id}-${random_id.bucket_suffix.hex}"
   tags   = merge(var.tags, { Name = "${local.name}-sftpgo-files" })
 
+  # checkov:skip=CKV_AWS_18: Server access logging is intentionally disabled; S3 audit logging is not required.
+  # checkov:skip=CKV2_AWS_62: S3 event notifications are intentionally disabled; S3 event auditing is not required.
+
   lifecycle {
     prevent_destroy = true
   }
@@ -32,8 +35,11 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "sftpgo" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.sftpgo_source.arn
     }
+
+    bucket_key_enabled = true
   }
 }
 

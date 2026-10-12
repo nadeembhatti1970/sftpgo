@@ -13,6 +13,16 @@ output "bucket_region" {
   value       = data.aws_region.current.region
 }
 
+output "replica_bucket_name" {
+  description = "Cross-region replica bucket for SFTPGo user files"
+  value       = aws_s3_bucket.sftpgo_replica.bucket
+}
+
+output "replica_bucket_region" {
+  description = "AWS region containing the SFTPGo replica bucket"
+  value       = var.replica_aws_region
+}
+
 output "user_key_prefix" {
   description = "Object key prefix allowed to the SFTPGo workload role"
   value       = local.user_prefix

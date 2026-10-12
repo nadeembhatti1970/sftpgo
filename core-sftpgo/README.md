@@ -1,7 +1,8 @@
 # SFTPGo S3 storage
 
-This Terraform project creates the private S3 bucket used for SFTPGo user files
-and a dedicated EKS Pod Identity role. The role is associated with the
+This Terraform project creates a private, KMS-encrypted S3 bucket used for
+SFTPGo user files, replicates objects to a second AWS region, and creates a
+dedicated EKS Pod Identity role. The role is associated with the
 `sftpgo/sftpgo` Kubernetes namespace/service-account pair and can access only
 objects below the bucket's `users/` prefix. No static AWS credentials are stored
 in Kubernetes or SFTPGo. CloudTrail S3 object data events are not configured.
@@ -18,13 +19,16 @@ terraform apply
 terraform output
 ```
 
-Keep the bucket: its Terraform resource has `prevent_destroy` enabled. Bucket
-versioning is enabled so overwritten or deleted files can be recovered. This
-retains noncurrent object versions until they are removed, which adds storage
-cost. Incomplete multipart uploads are cleaned up after seven days. S3 request
-metrics are enabled for the `users/` prefix; CloudWatch charges may apply for
-these metrics. CloudTrail object data events and S3 server access logging are
-not configured.
+Keep the buckets and KMS keys: their Terraform resources have
+`prevent_destroy` enabled. Versioning is enabled in both regions so overwritten
+or deleted files can be recovered. Replication uses a customer-managed KMS key
+in each region. Existing objects are not backfilled when replication is first
+enabled; this bucket is intended to be new and empty when deployed. Version
+history, replica storage, KMS requests, and cross-region transfer incur AWS
+charges. Incomplete multipart uploads are cleaned up after seven days. S3
+request metrics are enabled for the `users/` prefix; CloudWatch charges may
+apply for these metrics. CloudTrail object data events, S3 event notifications,
+and S3 server access logging are intentionally not configured.
 
 ## Connect SFTPGo
 
@@ -39,6 +43,10 @@ In SFTPGo WebAdmin, set the storage backend for each user to **S3** and use:
 - Key prefix: `users/<username>/`
 - Access key and secret: leave empty; the SFTPGo pod obtains temporary
   credentials through EKS Pod Identity.
+
+The cross-region copy bucket is available as `terraform output -raw
+replica_bucket_name` in `replica_bucket_region`. It is for recovery and should
+not be configured as the active SFTPGo storage backend.
 
 SFTPGo's S3 backend supports multipart transfers, but S3 does not implement all
 local filesystem operations: `chmod`, `chown`, symlinks, and atomic directory

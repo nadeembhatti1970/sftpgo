@@ -70,6 +70,23 @@ data "aws_iam_policy_document" "sftpgo_s3_access" {
 
     resources = ["${aws_s3_bucket.sftpgo.arn}/${local.user_prefix}*"]
   }
+
+  statement {
+    sid    = "UseKmsForSftpGoObjects"
+    effect = "Allow"
+    actions = [
+      "kms:Decrypt",
+      "kms:Encrypt",
+      "kms:GenerateDataKey",
+    ]
+    resources = [aws_kms_key.sftpgo_source.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["s3.${var.aws_region}.amazonaws.com"]
+    }
+  }
 }
 
 resource "aws_iam_policy" "sftpgo_s3_access" {
