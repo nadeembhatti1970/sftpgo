@@ -44,6 +44,7 @@
         "iam:GetRolePolicy",
         "iam:DeleteRolePolicy",
         "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
         "iam:ListRoleTags"
       ],
       "Resource": "arn:aws:iam::042170206259:role/devops-dev-sftpgo-s3-role"

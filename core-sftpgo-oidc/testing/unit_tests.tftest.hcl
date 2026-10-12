@@ -78,6 +78,18 @@ run "apply_role_push_access_is_scoped_to_the_sftpgo_ecr_repository" {
   }
 }
 
+run "apply_role_can_list_attached_policies_on_only_the_runtime_role" {
+  command = plan
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(file("${path.module}/sftpgo_terraform_apply_policy.json")).Statement :
+      s.Sid == "ManageSftpGoRuntimeRole" && contains(s.Action, "iam:ListAttachedRolePolicies") && s.Resource == "arn:aws:iam::042170206259:role/devops-dev-sftpgo-s3-role"
+    ])
+    error_message = "Apply role may list attached policies only on the SFTPGo runtime role"
+  }
+}
+
 run "apply_role_reads_only_eks_state_and_manages_only_sftpgo_state" {
   command = plan
 
