@@ -1,6 +1,6 @@
 # Deployment overlay for the EKS cluster managed by ../../core-infra.
-# Supply the certificate ARN from core-acm at install/upgrade time; ACM ARNs
-# are account-specific and must not be committed to this chart.
+# The AWS Load Balancer Controller discovers the wildcard ACM certificate from
+# the ingress hostname. ACM ARNs stay out of this chart's values.
 replicaCount: 1
 
 serviceAccount:
@@ -45,3 +45,17 @@ ui:
 api:
   ingress:
     enabled: false
+
+# Publish only the SFTP listener through an internet-facing NLB; the public UI
+# ingress remains the separate HTTP entry point.
+services:
+  sftp-public:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: external
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+      external-dns.alpha.kubernetes.io/hostname: sftp.bizopensource.com
+    ports:
+      sftp:
+        port: 22

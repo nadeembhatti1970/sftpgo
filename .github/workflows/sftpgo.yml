@@ -8,6 +8,7 @@ on:
       - '.github/workflows/sftpgo.yml'
       - '.github/scripts/**'
       - 'core-sftpgo/**'
+      - '!core-sftpgo/argocd/apps/**'
       - 'sftpgo-helm-chart'
       - 'requirements.txt'
       - 'README.md'
@@ -16,6 +17,7 @@ on:
       - '.github/workflows/sftpgo.yml'
       - '.github/scripts/**'
       - 'core-sftpgo/**'
+      - '!core-sftpgo/argocd/apps/**'
       - 'sftpgo-helm-chart'
       - 'requirements.txt'
       - 'README.md'
@@ -38,6 +40,7 @@ jobs:
   terraform-and-chart:
     name: Terraform checks, apply, and publish chart
     runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     concurrency:
       group: sftpgo-lifecycle
       cancel-in-progress: false
@@ -194,3 +197,4 @@ jobs:
         working-directory: .
         run: |
           echo "Published or verified SFTPGo chart version `${{ steps.chart.outputs.version }}` in the ECR `sftpgo` repository in `${AWS_REGION}`." >> "$GITHUB_STEP_SUMMARY"
+

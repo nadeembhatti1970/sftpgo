@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -25,3 +25,10 @@ jobs:
     name: Rebuild SFTPGo infrastructure and chart
     needs: guard
     uses: ./.github/workflows/sftpgo.yml
+
+  promote:
+    name: Promote rebuilt chart in Argo CD
+    needs: rebuild
+    uses: ./.github/workflows/promote-sftpgo-chart.yml
+    with:
+      source_sha: ${{ github.sha }}

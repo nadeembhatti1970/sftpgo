@@ -6,30 +6,26 @@ Full-featured and highly configurable SFTP, HTTP/S, FTP/S and WebDAV server.
 
 ## EKS deployment (core-infra)
 
-`values-dev.yaml` configures the SFTPGo UI at `sftpgo.bizopensource.com` behind an
-internet-facing AWS Load Balancer Controller ALB. ExternalDNS publishes the ALB
-address in the Route 53 zone created by `core-infra`; the ACM certificate created
-by `core-acm` terminates HTTPS at the ALB. The REST API ingress is disabled, and
-the chart provisions a persistent volume claim for SFTPGo's local data.
+`values-dev.yaml` publishes the SFTPGo UI at `sftpgo.bizopensource.com` through
+an internet-facing AWS Load Balancer Controller ALB, and the SFTP protocol on
+port 22 at `sftp.bizopensource.com` through an internet-facing NLB. The ALB
+discovers the wildcard ACM certificate from `core-acm` using the UI hostname.
+The SFTP NLB exposes only the SFTP port; the chart provisions a persistent
+volume claim for SFTPGo's local data.
 
-From the repository root, deploy with the certificate ARN from the Terraform
-output (the ACM certificate and ALB must be in the same AWS region):
+Argo CD deploys this chart from the Application manifest at
+`core-sftpgo/argocd/apps/sftpgo.yaml`. Commit the chart values and Application
+manifest to `main`; the SFTPGo GitHub Actions workflow publishes the chart to
+ECR and the chart-promotion workflow updates the Application's chart version.
+The root Argo CD Application then syncs the SFTPGo Application from Git.
 
-```bash
-CERT_ARN="$(terraform -chdir=../../core-infra/core-acm output -raw certificate_arn)"
-helm upgrade --install sftpgo ./sftpgo \
-  --namespace sftpgo --create-namespace \
-  --values ./sftpgo/values-dev.yaml \
-  --set-string 'ui.ingress.annotations.alb\.ingress\.kubernetes\.io/certificate-arn'="${CERT_ARN}" \
-  --wait
-```
-
-The deploying identity needs access to the target EKS cluster. The cluster must
-have the AWS Load Balancer Controller, ExternalDNS, the EKS Pod Identity Agent,
-and the default EBS storage class available. ExternalDNS also needs to manage
-the Route 53 zone, and the domain's delegated name servers must point to that
-zone. Set up the first SFTPGo administrator through the web UI after the ALB and
-DNS record become ready.
+The cluster must have the AWS Load Balancer Controller, ExternalDNS, the EKS Pod
+Identity Agent, and the default EBS storage class available. ExternalDNS manages
+records in Route 53. Because the public domain uses IONOS DNS, add CNAME records
+there after Argo CD syncs: `sftpgo` to the ALB hostname shown by
+`kubectl get ingress -n sftpgo`, and `sftp` to the NLB hostname shown by
+`kubectl get service -n sftpgo sftpgo-sftp-public`. Set up the first SFTPGo
+administrator through the web UI after the ALB and DNS record become ready.
 
 ### S3 file storage
 

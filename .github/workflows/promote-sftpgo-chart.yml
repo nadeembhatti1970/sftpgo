@@ -1,0 +1,64 @@
+# Pin the chart artifact published by a successful main-branch SFTPGo run in
+# the GitOps Application manifest. This workflow alone needs contents:write.
+name: promote-sftpgo-chart
+
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Commit whose successful SFTPGo run published the chart
+        required: true
+        type: string
+  workflow_run:
+    workflows: ["SFTPGo"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: sftpgo-chart-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: >-
+      (github.event_name == 'workflow_call' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the current GitOps branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Promote the published chart version
+        env:
+          SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          app_version=$(git show "${SOURCE_SHA}:sftpgo-helm-chart/sftpgo/Chart.yaml" \
+            | awk -F ': *' '$1 == "appVersion" { gsub(/"/, "", $2); print $2; exit }')
+          if [[ -z "$app_version" ]]; then
+            echo "::error::appVersion is missing from the SFTPGo chart at ${SOURCE_SHA}."
+            exit 1
+          fi
+
+          chart_version="${app_version}+git.${SOURCE_SHA}"
+          app_manifest="core-sftpgo/argocd/apps/sftpgo.yaml"
+          sed -i -E "s/^    targetRevision: .*/    targetRevision: \"${chart_version}\"/" "$app_manifest"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$app_manifest"
+          if git diff --cached --quiet; then
+            echo "The Argo CD application already tracks chart version ${chart_version}."
+            exit 0
+          fi
+
+          git commit -m "chore(gitops): promote SFTPGo ${chart_version}"
+          git push origin HEAD:main
+          echo "Promoted SFTPGo chart version `${chart_version}` for Argo CD." >> "$GITHUB_STEP_SUMMARY"
