@@ -9,7 +9,7 @@ on:
       - '.github/scripts/**'
       - 'core-sftpgo/**'
       - '!core-sftpgo/argocd/apps/**'
-      - 'sftpgo-helm-chart'
+      - 'sftpgo-helm-chart/**'
       - 'requirements.txt'
       - 'README.md'
   pull_request:
@@ -18,7 +18,7 @@ on:
       - '.github/scripts/**'
       - 'core-sftpgo/**'
       - '!core-sftpgo/argocd/apps/**'
-      - 'sftpgo-helm-chart'
+      - 'sftpgo-helm-chart/**'
       - 'requirements.txt'
       - 'README.md'
   workflow_dispatch:

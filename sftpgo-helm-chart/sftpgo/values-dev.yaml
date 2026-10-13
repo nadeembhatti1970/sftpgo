@@ -15,7 +15,7 @@ persistence:
     resources:
       requests:
         storage: 10Gi
-    storageClassName: ""
+    storageClassName: gp2
 
 podAnnotations:
   prometheus.io/scrape: "true"
