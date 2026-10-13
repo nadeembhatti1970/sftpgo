@@ -167,18 +167,30 @@ jobs:
         run: |
           set -euo pipefail
           registry="$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${AWS_REGION}.amazonaws.com"
-          aws ecr get-login-password --region "$AWS_REGION" \
-            | helm registry login "$registry" --username AWS --password-stdin
           shopt -s nullglob
           packages=("$RUNNER_TEMP"/sftpgo-chart/sftpgo-*.tgz)
           if [[ ${#packages[@]} -ne 1 ]]; then
             echo "Expected one packaged SFTPGo chart, found ${#packages[@]}" >&2
             exit 1
           fi
-          helm push "${packages[0]}" "oci://$registry"
+
+          chart_version="${{ steps.chart.outputs.version }}"
+          oci_tag="${chart_version//+/_}"
+          error_file="$RUNNER_TEMP/sftpgo-ecr-error.txt"
+          if aws ecr describe-images --region "$AWS_REGION" --repository-name sftpgo \
+            --image-ids "imageTag=$oci_tag" >/dev/null 2>"$error_file"; then
+            echo "Immutable SFTPGo chart tag $oci_tag already exists; skipping duplicate push."
+          elif grep -q 'ImageNotFoundException' "$error_file"; then
+            aws ecr get-login-password --region "$AWS_REGION" \
+              | helm registry login "$registry" --username AWS --password-stdin
+            helm push "${packages[0]}" "oci://$registry"
+          else
+            cat "$error_file" >&2
+            exit 1
+          fi
 
       - name: Summarize published chart
         if: steps.apply.outcome == 'success'
         working-directory: .
         run: |
-          echo "Published SFTPGo chart version `${{ steps.chart.outputs.version }}` to the ECR `sftpgo` repository in `${AWS_REGION}`." >> "$GITHUB_STEP_SUMMARY"
+          echo "Published or verified SFTPGo chart version `${{ steps.chart.outputs.version }}` in the ECR `sftpgo` repository in `${AWS_REGION}`." >> "$GITHUB_STEP_SUMMARY"

@@ -72,6 +72,14 @@ run "apply_role_push_access_is_scoped_to_the_sftpgo_ecr_repository" {
   assert {
     condition = anytrue([
       for s in data.aws_iam_policy_document.sftpgo_ecr_push.statement :
+      s.sid == "PushSftpGoHelmChart" && contains(s.actions, "ecr:DescribeImages") && s.resources == toset(["arn:aws:ecr:eu-west-2:111122223333:repository/sftpgo"])
+    ])
+    error_message = "Apply role may check for an existing chart tag only in the SFTPGo ECR repository"
+  }
+
+  assert {
+    condition = anytrue([
+      for s in data.aws_iam_policy_document.sftpgo_ecr_push.statement :
       s.sid == "AuthenticateToEcr" && contains(s.actions, "ecr:GetAuthorizationToken") && s.resources == toset(["*"])
     ])
     error_message = "ECR authentication token permission must be present"
