@@ -49,7 +49,7 @@ jobs:
         working-directory: core-sftpgo
     steps:
       - name: Check out project and chart submodule
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
