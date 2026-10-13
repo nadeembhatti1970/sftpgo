@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: 042170206259.dkr.ecr.eu-west-2.amazonaws.com
     chart: sftpgo
-    targetRevision: "*"
+    targetRevision: "2.7.5+git.4bfa60f2f82687a5870c19b570ffd68466a30c0f"
     helm:
       valueFiles:
         - values-dev.yaml
